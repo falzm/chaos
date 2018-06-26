@@ -100,21 +100,20 @@ curl -X PUT -H 'Content-Type: application/json' \
 	'localhost:8666/?method=GET&path=/api/b'
 ```
 
-Get the currently set chaos specification for the target route "GET /api/b":
+Get the currently set chaos specification for the target route `GET /api/b`:
 
 ```
 curl -i 'localhost:8666/?method=GET&path=/api/b'
 (returns Error: 599 "oh noes" (probability: 0.1))
 ```
 
-Delete the currently set chaos specification for the target route "GET /api/b":
+Delete the currently set chaos specification for the target route `GET /api/b`:
 
 ```
 curl -i -X DELETE 'localhost:8666/?method=GET&path=/api/b'
 ```
 
-Note: requests affected by a chaos specification feature a X-Chaos-Injected-* HTTP header
-describing the nature of the disruption. Example:
+Note: requests affected by a chaos specification feature a *X-Chaos-Injected-\** HTTP header describing the nature of the disruption. Example:
 
 ```
 X-Chaos-Injected-Delay: 3s (probability: 0.5)
