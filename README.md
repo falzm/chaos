@@ -1,5 +1,7 @@
 # Chaos Go HTTP middleware: Introduce a little anarchy...
 
+[![GoDoc](https://godoc.org/github.com/falzm/chaos?status.svg)](https://godoc.org/github.com/falzm/chaos)
+
 *Chaos* is a HTTP [Negroni](https://github.com/urfave/negroni) middleware that can be used to inject chaotic behavior into your web application (such as delays and errors) in a controlled and programmatic way. It can be useful in [chaos engineering](https://principlesofchaos.org/) for testing a distributed system resiliency, or to ensure application observability instrumentation is working as intended.
 
 The Chaos Middleware is configurable on-the-fly via a dedicated management HTTP controller. For earch target route (i.e. the actual HTTP endpoint that will be impacted by this middleware), it is possible to set a chaos specification defining either or both a delay artificially stalling the request processing and an error terminating the request processing with an arbitrary status code and optional message.
