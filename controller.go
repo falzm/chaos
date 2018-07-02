@@ -3,6 +3,7 @@ package chaos
 import (
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/facette/httputil"
@@ -10,7 +11,9 @@ import (
 
 type chaosController struct {
 	server *http.Server
-	chaos  *Chaos
+	routes map[string]*chaosSpec
+
+	sync.RWMutex
 }
 
 func (c *chaosController) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
@@ -100,13 +103,17 @@ func (c *chaosController) setRouteChaosSpec(rw http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	c.chaos.routes[method+path] = &cs
+	c.Lock()
+	c.routes[method+path] = &cs
+	c.Unlock()
 
 	rw.WriteHeader(http.StatusNoContent)
 }
 
 func (c *chaosController) getRouteChaosSpec(rw http.ResponseWriter, r *http.Request, method, path string) {
-	cs, ok := c.chaos.routes[method+path]
+	c.RLock()
+	cs, ok := c.routes[method+path]
+	c.RUnlock()
 	if !ok {
 		http.Error(rw, "No such route", http.StatusNotFound)
 		return
@@ -123,12 +130,17 @@ func (c *chaosController) getRouteChaosSpec(rw http.ResponseWriter, r *http.Requ
 }
 
 func (c *chaosController) delRouteChaosSpec(rw http.ResponseWriter, r *http.Request, method, path string) {
-	if _, ok := c.chaos.routes[method+path]; !ok {
+	c.RLock()
+	_, ok := c.routes[method+path]
+	c.RUnlock()
+	if !ok {
 		http.Error(rw, "No such endpoint", http.StatusNotFound)
 		return
 	}
 
-	delete(c.chaos.routes, method+path)
+	c.Lock()
+	delete(c.routes, method+path)
+	c.Unlock()
 
 	rw.WriteHeader(http.StatusNoContent)
 }

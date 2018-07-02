@@ -17,8 +17,6 @@ type chaosSpec struct {
 
 // Chaos represents an instance of a Chaos middleware.
 type Chaos struct {
-	routes map[string]*chaosSpec
-
 	controller *chaosController
 }
 
@@ -29,11 +27,11 @@ func NewChaos(bindAddr string) *Chaos {
 	}
 
 	c := Chaos{
-		routes:     make(map[string]*chaosSpec),
-		controller: &chaosController{},
+		controller: &chaosController{
+			routes: make(map[string]*chaosSpec),
+		},
 	}
 
-	c.controller.chaos = &c
 	c.controller.server = &http.Server{
 		Addr:    bindAddr,
 		Handler: c.controller,
@@ -46,7 +44,11 @@ func NewChaos(bindAddr string) *Chaos {
 
 // ServeHTTP is the middleware method implementing the Negroni HTTP middleware Handler interface type.
 func (c *Chaos) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	if cs, ok := c.routes[r.Method+r.URL.Path]; ok {
+	c.controller.RLock()
+	cs, ok := c.controller.routes[r.Method+r.URL.Path]
+	c.controller.RUnlock()
+
+	if ok {
 		if cs.injectDelay() {
 			rw.Header().Add("X-Chaos-Injected-Delay", fmt.Sprintf("%s (probability: %.1f)",
 				cs.ds.duration, cs.ds.probability))
