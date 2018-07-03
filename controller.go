@@ -62,6 +62,7 @@ func (c *chaosController) setRouteChaosSpec(rw http.ResponseWriter, r *http.Requ
 				Message     string  `json:"message"`
 				Probability float64 `json:"p"`
 			} `json:"error,omitempty"`
+			Duration string `json:"duration,omitempty"`
 		}
 	)
 
@@ -103,6 +104,16 @@ func (c *chaosController) setRouteChaosSpec(rw http.ResponseWriter, r *http.Requ
 		}
 	}
 
+	if data.Duration != "" {
+		duration, err := time.ParseDuration(data.Duration)
+		if err != nil {
+			http.Error(rw, fmt.Sprintf("Invalid value for duration parameter: %s", err), http.StatusBadRequest)
+			return
+		}
+
+		cs.until = time.Now().Add(duration)
+	}
+
 	c.Lock()
 	c.routes[method+path] = &cs
 	c.Unlock()
@@ -126,6 +137,10 @@ func (c *chaosController) getRouteChaosSpec(rw http.ResponseWriter, r *http.Requ
 	if cs.es != nil {
 		fmt.Fprintf(rw, "Error: %d %q (probability: %.1f)\n",
 			cs.es.statusCode, cs.es.message, cs.es.probability)
+	}
+
+	if !cs.until.IsZero() {
+		fmt.Fprintf(rw, "Until: %s\n", cs.until)
 	}
 }
 

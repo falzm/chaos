@@ -31,9 +31,12 @@ Set the chaos specification for the corresponding target route. The request body
   "delay": {
     "duration": <int: delay duration in milliseconds>,
     "p": <float: probability between 0 and 1>
-  }
+  },
+  "duration": <string: optional chaos effect duration in expressed in Go duration format*>
 }
 ```
+
+\*: [Go duration string format](https://godoc.org/time#ParseDuration)
 
 Upon successful request, a `204 No Content` status code is returned.
 

@@ -3,6 +3,7 @@ package chaos
 import (
 	"fmt"
 	"net/http"
+	"time"
 )
 
 // Default network address and port to bind the chaos management HTTP controller to.
@@ -12,7 +13,7 @@ type chaosSpec struct {
 	ds *delaySpec
 	es *errorSpec
 
-	// TODO: implement chaos effect duration
+	until time.Time
 }
 
 // Chaos represents an instance of a Chaos middleware.
@@ -20,7 +21,8 @@ type Chaos struct {
 	controller *chaosController
 }
 
-// NewChaos returns a new Chaos middleware instance, with management HTTP controller listening on bindAddr (fallback to DefaultBindAddr if empty).
+// NewChaos returns a new Chaos middleware instance, with management HTTP controller listening on bindAddr
+// (fallback to DefaultBindAddr if empty).
 func NewChaos(bindAddr string) *Chaos {
 	if bindAddr == "" {
 		bindAddr = DefaultBindAddr
@@ -48,7 +50,7 @@ func (c *Chaos) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Han
 	cs, ok := c.controller.routes[r.Method+r.URL.Path]
 	c.controller.RUnlock()
 
-	if ok {
+	if ok && (cs.until.IsZero() || time.Now().Before(cs.until)) {
 		if cs.injectDelay() {
 			rw.Header().Add("X-Chaos-Injected-Delay", fmt.Sprintf("%s (probability: %.1f)",
 				cs.ds.duration, cs.ds.probability))
