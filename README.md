@@ -2,7 +2,7 @@
 
 [![GoDoc](https://godoc.org/github.com/falzm/chaos?status.svg)](https://godoc.org/github.com/falzm/chaos)
 
-*Chaos* is a HTTP [Negroni](https://github.com/urfave/negroni) middleware that can be used to inject chaotic behavior into your web application (such as delays and errors) in a controlled and programmatic way. It can be useful in [chaos engineering](https://principlesofchaos.org/) for testing a distributed system resiliency, or to ensure application observability instrumentation is working as intended.
+*Chaos* is a HTTP middleware that can be used to inject chaotic behavior into your web application (such as delays and errors) in a controlled and programmatic way. It can be useful in [chaos engineering](https://principlesofchaos.org/) for testing a distributed system resiliency, or to ensure application observability instrumentation is working as intended.
 
 The Chaos Middleware is configurable on-the-fly via a dedicated management HTTP controller. For earch target route (i.e. the actual HTTP endpoint that will be impacted by this middleware), it is possible to set a chaos specification defining either or both a delay artificially stalling the request processing and an error terminating the request processing with an arbitrary status code and optional message.
 
@@ -54,7 +54,7 @@ Delete the chaos specification set for the corresponding target route.
 
 ## Example Usage
 
-For the following implementation with Negroni:
+For the following implementation with the Go standard library [net/http](https://godoc.org/net/http) package:
 
 ```go
 package main
@@ -65,7 +65,6 @@ import (
 
 	"github.com/falzm/chaos"
 	"github.com/gorilla/mux"
-	"github.com/urfave/negroni"
 )
 
 func handleAPI(rw http.ResponseWriter, r *http.Request) {
@@ -76,15 +75,10 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/api/{action}", handleAPI)
 
-	handlers := negroni.New(
-		negroni.NewLogger(),
-		chaos.NewChaos("127.0.0.1:8666"),
-	)
-
-	handlers.UseHandler(router)
-
-	http.ListenAndServe("localhost:8000", handlers)
+	http.ListenAndServe("127.0.0.1:8000",
+		chaos.NewChaos("127.0.0.1:8666").Handler(router.ServeHTTP))
 }
+
 ```
 
 Set a 3 seconds delay with a 50% probability and a 504 error with a 100% probability for target route `POST /api/a`:
@@ -121,4 +115,37 @@ Note: requests affected by a chaos specification feature a *X-Chaos-Injected-\**
 ```
 X-Chaos-Injected-Delay: 3s (probability: 0.5)
 X-Chaos-Injected-Error: 504 (probability: 1.0)
+```
+
+To use the middleware with [Negroni](https://github.com/urfave/negroni):
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/falzm/chaos"
+	"github.com/gorilla/mux"
+	"github.com/urfave/negroni"
+)
+
+func handleAPI(rw http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(rw, "ohai!")
+}
+
+func main() {
+	router := mux.NewRouter()
+	router.HandleFunc("/api/{action}", handleAPI)
+
+	handlers := negroni.New(
+		negroni.NewLogger(),
+		chaos.NewChaos("127.0.0.1:8666"),
+	)
+
+	handlers.UseHandler(router)
+
+	http.ListenAndServe("127.0.0.1:8000", handlers)
+}
 ```

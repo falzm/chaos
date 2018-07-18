@@ -44,6 +44,31 @@ func NewChaos(bindAddr string) *Chaos {
 	return &c
 }
 
+// Handler is the middleware method implementing the standard net/http Handler interface type.
+func (c *Chaos) Handler(h http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		c.controller.RLock()
+		cs, ok := c.controller.routes[r.Method+r.URL.Path]
+		c.controller.RUnlock()
+
+		if ok && (cs.until.IsZero() || time.Now().Before(cs.until)) {
+			if cs.injectDelay() {
+				rw.Header().Add("X-Chaos-Injected-Delay", fmt.Sprintf("%s (probability: %.1f)",
+					cs.ds.duration, cs.ds.probability))
+			}
+
+			if ok, statusCode, msg := cs.injectError(); ok {
+				rw.Header().Add("X-Chaos-Injected-Error", fmt.Sprintf("%d (probability: %.1f)",
+					cs.es.statusCode, cs.es.probability))
+				http.Error(rw, msg, statusCode)
+				return
+			}
+		}
+
+		h.ServeHTTP(rw, r)
+	})
+}
+
 // ServeHTTP is the middleware method implementing the Negroni HTTP middleware Handler interface type.
 func (c *Chaos) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	c.controller.RLock()
