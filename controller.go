@@ -1,17 +1,16 @@
 package chaos
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"sync"
-	"time"
-
-	"github.com/facette/httputil"
 )
 
 type chaosController struct {
 	server *http.Server
-	routes map[string]*chaosSpec
+	routes map[string]*spec
 
 	sync.RWMutex
 }
@@ -50,68 +49,17 @@ func (c *chaosController) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (c *chaosController) setRouteChaosSpec(rw http.ResponseWriter, r *http.Request, method, path string) {
-	var (
-		cs   chaosSpec
-		data struct {
-			Delay *struct {
-				Duration    int     `json:"duration"`
-				Probability float64 `json:"p"`
-			} `json:"delay,omitempty"`
-			Error *struct {
-				StatusCode  int     `json:"status_code"`
-				Message     string  `json:"message"`
-				Probability float64 `json:"p"`
-			} `json:"error,omitempty"`
-			Duration string `json:"duration,omitempty"`
-		}
-	)
+	var cs spec
 
-	if err := httputil.BindJSON(r, &data); err != nil {
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
 		http.Error(rw, fmt.Sprintf("Invalid request body: %s", err), http.StatusBadRequest)
 		return
 	}
 
-	if data.Error != nil {
-		cs.es = &errorSpec{
-			statusCode:  data.Error.StatusCode,
-			message:     data.Error.Message,
-			probability: data.Error.Probability,
-		}
-
-		if cs.es.statusCode < 100 || cs.es.statusCode > 600 {
-			http.Error(rw, "Error status code parameter value must be 100 < p < 600 ", http.StatusBadRequest)
-			return
-		}
-		if cs.es.probability < 0 || cs.es.probability > 1 {
-			http.Error(rw, "Probability parameter value must be 0 < p < 1 ", http.StatusBadRequest)
-			return
-		}
-	}
-
-	if data.Delay != nil {
-		cs.ds = &delaySpec{
-			duration:    time.Duration(data.Delay.Duration) * time.Millisecond,
-			probability: data.Delay.Probability,
-		}
-
-		if data.Delay.Duration <= 0 {
-			http.Error(rw, "Delay duration parameter value must be greater than 0 ", http.StatusBadRequest)
-			return
-		}
-		if cs.ds.probability < 0 || cs.ds.probability > 1 {
-			http.Error(rw, "Probability parameter value must be 0 < p < 1 ", http.StatusBadRequest)
-			return
-		}
-	}
-
-	if data.Duration != "" {
-		duration, err := time.ParseDuration(data.Duration)
-		if err != nil {
-			http.Error(rw, fmt.Sprintf("Invalid value for duration parameter: %s", err), http.StatusBadRequest)
-			return
-		}
-
-		cs.until = time.Now().Add(duration)
+	if err := json.Unmarshal(data, &cs); err != nil {
+		http.Error(rw, fmt.Sprintf("Invalid request body: %s", err), http.StatusBadRequest)
+		return
 	}
 
 	c.Lock()
@@ -123,24 +71,24 @@ func (c *chaosController) setRouteChaosSpec(rw http.ResponseWriter, r *http.Requ
 
 func (c *chaosController) getRouteChaosSpec(rw http.ResponseWriter, r *http.Request, method, path string) {
 	c.RLock()
-	cs, ok := c.routes[method+path]
+	spec, ok := c.routes[method+path]
 	c.RUnlock()
 	if !ok {
 		http.Error(rw, "No such route", http.StatusNotFound)
 		return
 	}
 
-	if cs.ds != nil {
-		fmt.Fprintf(rw, "Delay: %s (probability: %.1f)\n", cs.ds.duration, cs.ds.probability)
+	if spec.delay != nil {
+		fmt.Fprintf(rw, "Delay: %s (probability: %.1f)\n", spec.delay.duration, spec.delay.probability)
 	}
 
-	if cs.es != nil {
+	if spec.err != nil {
 		fmt.Fprintf(rw, "Error: %d %q (probability: %.1f)\n",
-			cs.es.statusCode, cs.es.message, cs.es.probability)
+			spec.err.statusCode, spec.err.message, spec.err.probability)
 	}
 
-	if !cs.until.IsZero() {
-		fmt.Fprintf(rw, "Until: %s\n", cs.until)
+	if !spec.until.IsZero() {
+		fmt.Fprintf(rw, "Until: %s\n", spec.until)
 	}
 }
 
