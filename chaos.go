@@ -2,7 +2,9 @@ package chaos
 
 import (
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -14,27 +16,40 @@ type Chaos struct {
 	controller *chaosController
 }
 
-// NewChaos returns a new Chaos middleware instance, with management HTTP controller listening on bindAddr
-// (fallback to DefaultBindAddr if empty).
-func NewChaos(bindAddr string) *Chaos {
+// NewChaos returns a new Chaos middleware instance with management HTTP controller listening on bindAddr
+// (fallback to DefaultBindAddr if empty), or a non-nil error if middleware initialization failed. If bindAddr starts
+// with "unix:", the controller will be bound to a UNIX socket at the path described after the "unix:" prefix (e.g.
+// "unix:/var/run/http-chaos.sock").
+func NewChaos(bindAddr string) (*Chaos, error) {
+	var (
+		c = Chaos{
+			controller: &chaosController{
+				routes: make(map[string]*spec),
+			},
+		}
+		listener net.Listener
+		err      error
+	)
+
 	if bindAddr == "" {
 		bindAddr = DefaultBindAddr
 	}
 
-	c := Chaos{
-		controller: &chaosController{
-			routes: make(map[string]*spec),
-		},
+	c.controller.server = &http.Server{Handler: c.controller}
+
+	if strings.HasPrefix(bindAddr, "unix:") {
+		if listener, err = net.Listen("unix", strings.TrimPrefix(bindAddr, "unix:")); err != nil {
+			return nil, fmt.Errorf("unable to bind UNIX socket: %s", err)
+		}
+	} else {
+		if listener, err = net.Listen("tcp", bindAddr); err != nil {
+			return nil, fmt.Errorf("unable to bind TCP socket: %s", err)
+		}
 	}
 
-	c.controller.server = &http.Server{
-		Addr:    bindAddr,
-		Handler: c.controller,
-	}
+	go c.controller.server.Serve(listener)
 
-	go c.controller.server.ListenAndServe()
-
-	return &c
+	return &c, nil
 }
 
 // Handler is the middleware method implementing the standard net/http Handler interface type.

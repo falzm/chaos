@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
 )
 
 // Client represents a chaos controller management client.
@@ -24,6 +25,11 @@ func NewClient(controllerAddr string) *Client {
 
 	if controllerAddr == "" {
 		controllerAddr = DefaultBindAddr
+	}
+
+	if strings.HasPrefix(controllerAddr, "unix:") {
+		controllerProto = "unix"
+		controllerAddr = strings.TrimPrefix(controllerAddr, "unix:")
 	}
 
 	client.http = http.Client{
