@@ -29,7 +29,7 @@ func (s *errorSpec) UnmarshalJSON(data []byte) error {
 	s.probability = spec.Probability
 
 	if s.statusCode < 100 || s.statusCode > 600 {
-		return fmt.Errorf("error status code parameter value must be 100 < p < 600 ")
+		return fmt.Errorf("error status code parameter value must be 100 < n < 600 ")
 	}
 
 	if s.probability < 0 || s.probability > 1 {
