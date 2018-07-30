@@ -149,3 +149,14 @@ func main() {
 	http.ListenAndServe("127.0.0.1:8000", handlers)
 }
 ```
+
+## Utilities
+
+In addition to the native Go HTTP middleware, the following utilities might be useful to you:
+
+* [chaos-proxy][0]: basic reverse-proxy embedding a Chaos middleware instance that can be used in front of a back-end
+  HTTP service to inject chaos when it's not possible to implement the Go HTTP middleware natively
+* [chaosctl][1]: convenience utility to dynamically interact with a Chaos middleware instance
+
+[0]: https://github.com/falzm/chaos/tree/master/cmd/chaos-proxy
+[1]: https://github.com/falzm/chaos/tree/master/cmd/chaosctl
